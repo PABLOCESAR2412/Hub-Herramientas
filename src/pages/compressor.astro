@@ -70,8 +70,12 @@ import Topbar from '../components/Topbar.astro';
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
             <div>Sube una imagen para comprimir</div>
           </div>
-          <div class="preview-container hidden" id="previewContainerComp">
+          <div class="preview-container hidden" id="previewContainerComp" style="position: relative;">
             <img id="previewImgComp" />
+            <div id="loadingOverlayComp" class="overlay hidden">
+              <div class="spinner"></div>
+              <div class="overlay-text" id="overlayTextComp">Procesando...</div>
+            </div>
           </div>
         </section>
       </div>
@@ -134,6 +138,9 @@ import Topbar from '../components/Topbar.astro';
   const statComp = document.getElementById('statComp');
   const statDiff = document.getElementById('statDiff');
 
+  const loadingOverlayComp = document.getElementById('loadingOverlayComp');
+  const overlayTextComp = document.getElementById('overlayTextComp');
+
   if (dropZoneComp && fileInputComp) {
     dropZoneComp.addEventListener('click', () => fileInputComp.click());
     dropZoneComp.addEventListener('dragover', (e) => { e.preventDefault(); dropZoneComp.classList.add('dragover'); });
@@ -152,12 +159,28 @@ import Topbar from '../components/Topbar.astro';
   let compressionTimer: number | null = null;
   let objectUrl: string | null = null;
 
+  function showLoading() {
+    if(!loadingOverlayComp || !overlayTextComp) return;
+    loadingOverlayComp.className = 'overlay';
+    overlayTextComp.textContent = 'Comprimiendo...';
+  }
+
+  function showSuccess() {
+    if(!loadingOverlayComp || !overlayTextComp) return;
+    loadingOverlayComp.className = 'overlay overlay-success';
+    overlayTextComp.textContent = '¡Listo para descargar!';
+    setTimeout(() => {
+      loadingOverlayComp.classList.add('hidden');
+    }, 1200);
+  }
+
   compQuality?.addEventListener('input', (e) => { 
     stateComp.quality = parseInt((e.target as HTMLInputElement).value); 
     if(qualityValComp) qualityValComp.textContent = stateComp.quality + '%'; 
     
     if (compressionTimer) clearTimeout(compressionTimer);
     compressionTimer = setTimeout(() => {
+      showLoading();
       renderCompression();
     }, 150) as any;
   });
@@ -166,12 +189,14 @@ import Topbar from '../components/Topbar.astro';
     stateComp.format = 'image/webp';
     fmtWebp.classList.add('active'); fmtJpeg?.classList.remove('active');
     if(dlFmtTxt) dlFmtTxt.textContent = 'WebP';
+    showLoading();
     renderCompression();
   });
   fmtJpeg?.addEventListener('click', () => {
     stateComp.format = 'image/jpeg';
     fmtJpeg.classList.add('active'); fmtWebp?.classList.remove('active');
     if(dlFmtTxt) dlFmtTxt.textContent = 'JPEG';
+    showLoading();
     renderCompression();
   });
 
@@ -233,33 +258,37 @@ import Topbar from '../components/Topbar.astro';
     tempCanvas.toBlob((blob) => {
       if (!blob || !stateComp.file) return;
       
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-      
-      objectUrl = URL.createObjectURL(blob);
-      stateComp.dataUrl = objectUrl;
-      previewImgComp.src = objectUrl;
+      setTimeout(() => {
+        if (objectUrl) URL.revokeObjectURL(objectUrl);
+        
+        objectUrl = URL.createObjectURL(blob);
+        stateComp.dataUrl = objectUrl;
+        previewImgComp.src = objectUrl;
 
-      const origBytes = stateComp.file.size;
-      const compBytes = blob.size;
-      
-      const diff = origBytes - compBytes;
-      const pct = Math.round((diff / origBytes) * 100);
+        const origBytes = stateComp.file.size;
+        const compBytes = blob.size;
+        
+        const diff = origBytes - compBytes;
+        const pct = Math.round((diff / origBytes) * 100);
 
-      if(statOrig) statOrig.textContent = formatBytes(origBytes);
-      if(statComp) statComp.textContent = formatBytes(compBytes);
-      
-      if (statDiff) {
-        if (pct > 0) {
-          statDiff.textContent = `-${pct}%`;
-          statDiff.className = 'stats-val good';
-        } else if (pct < 0) {
-          statDiff.textContent = `+${Math.abs(pct)}%`;
-          statDiff.className = 'stats-val bad';
-        } else {
-          statDiff.textContent = `0%`;
-          statDiff.className = 'stats-val';
+        if(statOrig) statOrig.textContent = formatBytes(origBytes);
+        if(statComp) statComp.textContent = formatBytes(compBytes);
+        
+        if (statDiff) {
+          if (pct > 0) {
+            statDiff.textContent = `-${pct}%`;
+            statDiff.className = 'stats-val good';
+          } else if (pct < 0) {
+            statDiff.textContent = `+${Math.abs(pct)}%`;
+            statDiff.className = 'stats-val bad';
+          } else {
+            statDiff.textContent = `0%`;
+            statDiff.className = 'stats-val';
+          }
         }
-      }
+        
+        showSuccess();
+      }, 500);
     }, stateComp.format, stateComp.quality / 100);
   }
 </script>
