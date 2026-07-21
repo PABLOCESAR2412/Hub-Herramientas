@@ -10,9 +10,15 @@ const currentPath = Astro.url.pathname;
     Hub de Herramientas
   </div>
   
+  <div style="padding: 0 12px; margin-bottom: 12px;">
+    <a href="/" class={`nav-item ${currentPath === '/' ? 'active' : ''}`} style="background: var(--accent); color: white; justify-content: center; font-weight: 600;">
+      Dashboard Principal
+    </a>
+  </div>
+
   <div class="nav-section">
-    <div class="nav-title">Disponibles</div>
-    <a href="/" class={`nav-item ${currentPath === '/' ? 'active' : ''}`}>
+    <div class="nav-title">Imágenes</div>
+    <a href="/watermark" class={`nav-item ${currentPath === '/watermark' ? 'active' : ''}`}>
       Marca de Agua
     </a>
     <a href="/compressor" class={`nav-item ${currentPath === '/compressor' ? 'active' : ''}`}>
@@ -33,9 +39,6 @@ const currentPath = Astro.url.pathname;
     <a href="/exif" class={`nav-item ${currentPath === '/exif' ? 'active' : ''}`}>
       Limpiar Metadatos
     </a>
-    <a href="/favicon" class={`nav-item ${currentPath === '/favicon' ? 'active' : ''}`}>
-      Generar Favicons
-    </a>
   </div>
 
   <div class="nav-section">
@@ -43,6 +46,36 @@ const currentPath = Astro.url.pathname;
     <a href="/shortener" class={`nav-item ${currentPath === '/shortener' ? 'active' : ''}`}>
       Acortador de Links
     </a>
+    <a href="/favicon" class={`nav-item ${currentPath === '/favicon' ? 'active' : ''}`}>
+      Generar Favicons
+    </a>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-title">Texto y Código</div>
+    <a href="/json-formatter" class={`nav-item ${currentPath === '/json-formatter' ? 'active' : ''}`}>
+      Formateador JSON
+    </a>
+    <a href="/text-counter" class={`nav-item ${currentPath === '/text-counter' ? 'active' : ''}`}>
+      Analizador de Texto
+    </a>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-title">PDFs</div>
+    <a href="/pdf-merge" class={`nav-item ${currentPath === '/pdf-merge' ? 'active' : ''}`}>
+      Unir PDFs
+    </a>
+  </div>
+
+  <div style="flex-grow: 1;"></div>
+  
+  <div style="padding: 16px; border-top: 1px solid var(--border);">
+    <button id="themeToggle" class="theme-btn">
+      <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+      <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+      <span class="theme-text">Cambiar Tema</span>
+    </button>
   </div>
 </aside>
 
@@ -54,6 +87,7 @@ const currentPath = Astro.url.pathname;
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
+  overflow-y: auto;
 }
 .brand {
   padding: 24px;
@@ -77,8 +111,8 @@ const currentPath = Astro.url.pathname;
 .brand-icon svg { width: 14px; height: 14px; fill: #fff; }
 
 .nav-section {
-  padding: 12px;
-  margin-bottom: 8px;
+  padding: 0 12px;
+  margin-bottom: 24px;
 }
 .nav-title {
   font-family: var(--font-mono);
@@ -106,25 +140,69 @@ const currentPath = Astro.url.pathname;
   color: var(--accent);
   font-weight: 500;
 }
-.nav-item.disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.nav-item:not(.disabled):hover {
+.nav-item:not(.active):not([style*="background"]):hover {
   color: var(--text-main);
   background-color: var(--bg-panel);
 }
-.nav-item.active:hover {
-  background-color: rgba(108, 92, 231, 0.15);
+
+.theme-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-main);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  transition: border-color 0.2s;
 }
-.badge {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  text-transform: uppercase;
-  padding: 3px 6px;
-  border-radius: 4px;
-  background-color: var(--border);
+.theme-btn:hover {
+  border-color: var(--accent);
+}
+.theme-btn svg {
+  width: 16px;
+  height: 16px;
   color: var(--text-secondary);
-  letter-spacing: 0.5px;
 }
 </style>
+
+<script>
+  const toggleBtn = document.getElementById('themeToggle');
+  const sunIcon = toggleBtn?.querySelector('.sun-icon') as HTMLElement;
+  const moonIcon = toggleBtn?.querySelector('.moon-icon') as HTMLElement;
+  const themeText = toggleBtn?.querySelector('.theme-text') as HTMLElement;
+
+  function updateIcons(theme: string) {
+    if (theme === 'light') {
+      sunIcon.style.display = 'none';
+      moonIcon.style.display = 'block';
+      themeText.textContent = 'Modo Oscuro';
+    } else {
+      sunIcon.style.display = 'block';
+      moonIcon.style.display = 'none';
+      themeText.textContent = 'Modo Claro';
+    }
+  }
+
+  // Initialize
+  const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+  updateIcons(currentTheme);
+
+  toggleBtn?.addEventListener('click', () => {
+    const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+    const newTheme = isLight ? 'dark' : 'light';
+    
+    if (newTheme === 'light') {
+      document.documentElement.setAttribute('data-theme', 'light');
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+    }
+    
+    localStorage.setItem('hub-theme', newTheme);
+    updateIcons(newTheme);
+  });
+</script>

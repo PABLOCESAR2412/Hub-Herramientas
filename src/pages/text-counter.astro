@@ -1,0 +1,123 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Sidebar from '../components/Sidebar.astro';
+import Topbar from '../components/Topbar.astro';
+---
+
+<Layout title="Analizador de Texto">
+  <Sidebar />
+  <main class="main-content">
+    <Topbar 
+      title="Analizador de Texto" 
+      desc="&mdash; Cuenta palabras, caracteres y estima el tiempo de lectura en tiempo real." 
+    />
+    
+    <div class="workspace" style="display: flex; flex-direction: column; padding: 24px; gap: 24px; height: calc(100vh - 70px);">
+      
+      <!-- Stats Top Bar -->
+      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;">
+        <div class="stat-box">
+          <div class="stat-label">Palabras</div>
+          <div class="stat-value" id="valWords">0</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">Caracteres (con espacios)</div>
+          <div class="stat-value" id="valChars">0</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">Caracteres (sin espacios)</div>
+          <div class="stat-value" id="valCharsNoSp">0</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">Tiempo de Lectura</div>
+          <div class="stat-value" id="valTime">0 min</div>
+        </div>
+      </div>
+
+      <!-- Text Area -->
+      <div style="flex: 1; display: flex; flex-direction: column; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 12px; overflow: hidden;">
+        <div style="padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--bg-base);">
+          <span style="font-weight: 600; font-size: 14px;">Escribe o pega tu texto</span>
+          <div style="display: flex; gap: 8px;">
+            <button id="btnCase" class="btn-primary" style="padding: 6px 12px; font-size: 12px; background: transparent; color: var(--text-secondary); border: 1px solid var(--border);">A / a</button>
+            <button id="btnClearText" class="btn-primary" style="padding: 6px 12px; font-size: 12px; background: transparent; color: var(--text-secondary); border: 1px solid var(--border);">Limpiar</button>
+          </div>
+        </div>
+        <textarea id="textInput" placeholder="Empieza a escribir..." style="flex: 1; width: 100%; border: none; background: transparent; color: var(--text-main); font-family: var(--font-sans); font-size: 16px; padding: 24px; resize: none; outline: none; line-height: 1.6;"></textarea>
+      </div>
+
+    </div>
+  </main>
+</Layout>
+
+<style>
+.stat-box {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.stat-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 500;
+}
+.stat-value {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--accent);
+  font-family: var(--font-mono);
+}
+</style>
+
+<script>
+  const textInput = document.getElementById('textInput') as HTMLTextAreaElement;
+  const valWords = document.getElementById('valWords');
+  const valChars = document.getElementById('valChars');
+  const valCharsNoSp = document.getElementById('valCharsNoSp');
+  const valTime = document.getElementById('valTime');
+  
+  const btnClearText = document.getElementById('btnClearText');
+  const btnCase = document.getElementById('btnCase');
+
+  function analyzeText() {
+    const text = textInput.value;
+    
+    // Characters
+    const charCount = text.length;
+    const charNoSpCount = text.replace(/\s+/g, '').length;
+    
+    // Words
+    const wordMatch = text.trim().match(/\b\S+\b/g);
+    const wordCount = wordMatch ? wordMatch.length : 0;
+    
+    // Time (avg 238 words per minute)
+    const minutes = Math.ceil(wordCount / 200);
+    
+    if (valWords) valWords.textContent = wordCount.toString();
+    if (valChars) valChars.textContent = charCount.toString();
+    if (valCharsNoSp) valCharsNoSp.textContent = charNoSpCount.toString();
+    if (valTime) valTime.textContent = minutes > 0 ? `${minutes} min` : '0 min';
+  }
+
+  textInput?.addEventListener('input', analyzeText);
+
+  btnClearText?.addEventListener('click', () => {
+    if(textInput) {
+      textInput.value = '';
+      analyzeText();
+    }
+  });
+
+  let caseToggle = false;
+  btnCase?.addEventListener('click', () => {
+    if (!textInput) return;
+    textInput.value = caseToggle ? textInput.value.toLowerCase() : textInput.value.toUpperCase();
+    caseToggle = !caseToggle;
+  });
+</script>

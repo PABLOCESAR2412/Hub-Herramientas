@@ -1,0 +1,218 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Sidebar from '../components/Sidebar.astro';
+import Topbar from '../components/Topbar.astro';
+---
+
+<Layout title="Unir PDFs">
+  <Sidebar />
+  <main class="main-content">
+    <Topbar 
+      title="Unir Archivos PDF" 
+      desc="&mdash; Combina múltiples archivos PDF en uno solo. Arrastra para reordenar." 
+    />
+    
+    <div class="workspace" style="display: flex; gap: 24px; padding: 24px; height: calc(100vh - 70px);">
+      
+      <!-- List Panel -->
+      <div style="flex: 1; display: flex; flex-direction: column; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 12px; overflow: hidden;">
+        
+        <div class="upload-zone" id="dropZonePdf" style="margin: 16px; border: 2px dashed var(--border); border-radius: 8px; text-align: center; padding: 32px 16px; cursor: pointer; background: var(--bg-base); transition: all 0.2s;">
+          <div style="color: var(--accent); margin-bottom: 12px;">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg>
+          </div>
+          <div style="font-weight: 500; color: var(--text-main); margin-bottom: 4px;">Click o arrastra tus PDFs aquí</div>
+          <div style="font-size: 13px; color: var(--text-tertiary);">Puedes seleccionar varios archivos a la vez</div>
+          <input type="file" id="fileInputPdf" accept="application/pdf" multiple class="hidden">
+        </div>
+
+        <div style="padding: 12px 16px; border-bottom: 1px solid var(--border); border-top: 1px solid var(--border); background: var(--bg-base); display: flex; justify-content: space-between;">
+          <span style="font-weight: 600; font-size: 14px;">Archivos seleccionados (<span id="pdfCount">0</span>)</span>
+          <button id="btnClearPdf" style="background: none; border: none; color: #F56565; font-size: 12px; cursor: pointer;">Borrar Todos</button>
+        </div>
+        
+        <div id="pdfList" style="flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 8px;">
+          <div id="pdfEmpty" style="text-align: center; padding: 32px; color: var(--text-tertiary); font-size: 13px;">No has subido ningún PDF aún.</div>
+          <!-- Items will be injected here -->
+        </div>
+
+      </div>
+
+      <!-- Controls Panel -->
+      <div style="width: 320px; display: flex; flex-direction: column; gap: 24px;">
+        
+        <div style="background: var(--bg-panel); border: 1px solid var(--border); border-radius: 12px; padding: 24px;">
+          <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 16px;">Combinar y Exportar</h3>
+          
+          <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 24px; line-height: 1.5;">
+            Los archivos se unirán en el orden en que aparecen en la lista. Si deseas reordenarlos, elimínalos y súbelos en el orden deseado. (Toda la operación se realiza localmente por seguridad).
+          </div>
+
+          <button id="btnMerge" class="btn-primary" style="width: 100%; justify-content: center; padding: 14px;" disabled>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            Unir y Descargar PDF
+          </button>
+          
+          <div id="mergeStatus" class="hidden" style="margin-top: 16px; font-size: 13px; color: #48BB78; text-align: center; font-weight: 500;"></div>
+        </div>
+
+      </div>
+
+    </div>
+  </main>
+</Layout>
+
+<script>
+  import { PDFDocument } from 'pdf-lib';
+
+  const dropZonePdf = document.getElementById('dropZonePdf');
+  const fileInputPdf = document.getElementById('fileInputPdf') as HTMLInputElement;
+  const pdfList = document.getElementById('pdfList');
+  const pdfEmpty = document.getElementById('pdfEmpty');
+  const pdfCount = document.getElementById('pdfCount');
+  const btnClearPdf = document.getElementById('btnClearPdf');
+  const btnMerge = document.getElementById('btnMerge') as HTMLButtonElement;
+  const mergeStatus = document.getElementById('mergeStatus');
+
+  let files: File[] = [];
+
+  if (dropZonePdf && fileInputPdf) {
+    dropZonePdf.addEventListener('click', () => fileInputPdf.click());
+    dropZonePdf.addEventListener('dragover', (e) => { e.preventDefault(); dropZonePdf.style.borderColor = 'var(--accent)'; });
+    dropZonePdf.addEventListener('dragleave', () => { dropZonePdf.style.borderColor = 'var(--border)'; });
+    dropZonePdf.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZonePdf.style.borderColor = 'var(--border)';
+      if (e.dataTransfer?.files) addFiles(Array.from(e.dataTransfer.files));
+    });
+    fileInputPdf.addEventListener('change', (e) => {
+      const target = e.target as HTMLInputElement;
+      if (target.files) addFiles(Array.from(target.files));
+      target.value = ''; // reset
+    });
+  }
+
+  function addFiles(newFiles: File[]) {
+    const pdfs = newFiles.filter(f => f.type === 'application/pdf');
+    files = [...files, ...pdfs];
+    renderList();
+  }
+
+  function formatBytes(bytes: number) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  }
+
+  function renderList() {
+    if (!pdfList || !pdfEmpty || !pdfCount || !btnMerge) return;
+    
+    pdfCount.textContent = files.length.toString();
+    
+    if (files.length === 0) {
+      pdfEmpty.style.display = 'block';
+      btnMerge.disabled = true;
+      pdfList.innerHTML = '';
+      pdfList.appendChild(pdfEmpty);
+      return;
+    }
+
+    pdfEmpty.style.display = 'none';
+    btnMerge.disabled = files.length < 2;
+    
+    // Clear list but keep empty state hidden
+    Array.from(pdfList.children).forEach(child => {
+      if (child !== pdfEmpty) child.remove();
+    });
+
+    files.forEach((file, index) => {
+      const item = document.createElement('div');
+      item.style.cssText = `
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: var(--bg-base);
+        padding: 12px 16px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+      `;
+      
+      item.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 12px; overflow: hidden;">
+          <div style="color: var(--accent);">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+          </div>
+          <div style="display: flex; flex-direction: column; overflow: hidden;">
+            <span style="font-size: 14px; font-weight: 500; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${file.name}</span>
+            <span style="font-size: 12px; color: var(--text-tertiary);">${formatBytes(file.size)}</span>
+          </div>
+        </div>
+        <button class="delete-btn" data-index="${index}" style="background: none; border: none; color: var(--text-tertiary); cursor: pointer; padding: 4px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      `;
+      
+      item.querySelector('.delete-btn')?.addEventListener('click', (e) => {
+        const idx = parseInt((e.currentTarget as HTMLButtonElement).dataset.index!);
+        files.splice(idx, 1);
+        renderList();
+      });
+      
+      pdfList.appendChild(item);
+    });
+  }
+
+  btnClearPdf?.addEventListener('click', () => {
+    files = [];
+    renderList();
+  });
+
+  btnMerge?.addEventListener('click', async () => {
+    if (files.length < 2) return;
+    
+    btnMerge.disabled = true;
+    const origText = btnMerge.innerHTML;
+    btnMerge.innerHTML = `<div class="spinner" style="width: 16px; height: 16px; border-width: 2px; margin-right: 8px;"></div> Uniendo...`;
+    if(mergeStatus) mergeStatus.classList.add('hidden');
+
+    try {
+      const mergedPdf = await PDFDocument.create();
+      
+      for (const file of files) {
+        const arrayBuffer = await file.arrayBuffer();
+        const pdfDoc = await PDFDocument.load(arrayBuffer);
+        const copiedPages = await mergedPdf.copyPages(pdfDoc, pdfDoc.getPageIndices());
+        copiedPages.forEach((page) => mergedPdf.addPage(page));
+      }
+
+      const mergedPdfFile = await mergedPdf.save();
+      const blob = new Blob([mergedPdfFile], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'hub_unido.pdf';
+      link.click();
+      
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      
+      if(mergeStatus) {
+        mergeStatus.textContent = '¡PDF combinado con éxito!';
+        mergeStatus.classList.remove('hidden');
+      }
+      
+    } catch (e) {
+      console.error(e);
+      if(mergeStatus) {
+        mergeStatus.textContent = 'Error al unir los PDFs.';
+        mergeStatus.style.color = '#F56565';
+        mergeStatus.classList.remove('hidden');
+      }
+    } finally {
+      btnMerge.innerHTML = origText;
+      btnMerge.disabled = false;
+    }
+  });
+</script>
