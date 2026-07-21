@@ -21,12 +21,8 @@ const currentPath = Astro.url.pathname;
     <a href="/converter" class={`nav-item ${currentPath === '/converter' ? 'active' : ''}`}>
       Convertir Formato
     </a>
-  </div>
-
-  <div class="nav-section">
-    <div class="nav-title">Próximamente</div>
-    <a href="#" class="nav-item disabled">
-      Redimensionar <span class="badge">Pronto</span>
+    <a href="/resizer" class={`nav-item ${currentPath === '/resizer' ? 'active' : ''}`}>
+      Redimensionar
     </a>
   </div>
 </aside>

@@ -1,0 +1,346 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Sidebar from '../components/Sidebar.astro';
+import Topbar from '../components/Topbar.astro';
+---
+
+<Layout title="Redimensionar Imagen">
+  <Sidebar />
+  <main class="main-content">
+    <Topbar 
+      title="Redimensionar Imagen" 
+      desc="&mdash; Cambia el tamaño (ancho y alto) de tus imágenes rápidamente." 
+    />
+    
+    <div class="workspace">
+      <div class="workspace-view" id="viewResizer">
+        <aside class="controls-panel">
+          
+          <div class="upload-zone" id="dropZoneRes">
+            <div class="upload-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+            </div>
+            <div class="upload-text">Click o arrastra tu imagen aquí</div>
+            <div class="upload-filename hidden" id="fileNameRes"></div>
+            <input type="file" id="fileInputRes" accept="image/*" class="hidden">
+          </div>
+
+          <div class="control-group">
+            <div class="control-header">
+              <label class="control-label">Dimensiones (Pixeles)</label>
+            </div>
+            <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px;">
+              <input type="number" id="resWidth" placeholder="Ancho" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid var(--border); background: var(--bg-panel); color: var(--text-main);">
+              <span style="color: var(--text-tertiary);">x</span>
+              <input type="number" id="resHeight" placeholder="Alto" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid var(--border); background: var(--bg-panel); color: var(--text-main);">
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-secondary);">
+              <input type="checkbox" id="resKeepRatio" checked>
+              <label for="resKeepRatio">Mantener proporción</label>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <div class="control-header">
+              <label class="control-label">Formato de Salida</label>
+            </div>
+            <select id="resFormat" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid var(--border); background: var(--bg-panel); color: var(--text-main);">
+              <option value="image/png">PNG</option>
+              <option value="image/jpeg">JPEG</option>
+              <option value="image/webp">WebP</option>
+            </select>
+          </div>
+
+          <div class="control-group" id="resQualityGroup" style="display: none;">
+            <div class="control-header">
+              <label class="control-label">Calidad</label>
+              <span class="control-val" id="resQualityVal">90%</span>
+            </div>
+            <input type="range" id="resQuality" min="1" max="100" value="90">
+          </div>
+
+          <div class="stats-card hidden" id="resStats">
+            <div class="stats-row">
+              <span class="stats-label">Tamaño Original:</span>
+              <span class="stats-val" id="statOrigRes">--</span>
+            </div>
+            <div class="stats-row">
+              <span class="stats-label">Nuevo Tamaño:</span>
+              <span class="stats-val highlight" id="statNewRes">--</span>
+            </div>
+          </div>
+
+          <button id="downloadBtnRes" class="btn-primary" disabled>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            Descargar
+          </button>
+
+        </aside>
+
+        <section class="preview-area" id="previewAreaRes">
+          <div class="empty-state" id="emptyStateRes">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+            <div>Sube una imagen para redimensionar</div>
+          </div>
+          <div class="preview-container hidden" id="previewContainerRes" style="position: relative;">
+            <img id="previewImgRes" />
+            <div id="loadingOverlayRes" class="overlay hidden">
+              <div class="spinner"></div>
+              <div class="overlay-text" id="overlayTextRes">Procesando...</div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+</Layout>
+
+<style>
+/* Stats Card (for resizer) */
+.stats-card {
+  background: var(--bg-base);
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  margin-bottom: 24px;
+}
+.stats-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.stats-row:last-child {
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+  margin-top: 4px;
+  margin-bottom: 0;
+}
+.stats-label { color: var(--text-secondary); font-size: 13px; }
+.stats-val { font-family: var(--font-mono); font-size: 13px; color: var(--text-main); }
+.stats-val.highlight { color: var(--accent); font-weight: bold; }
+</style>
+
+<script>
+  const stateRes = {
+    file: null as File | null,
+    image: null as HTMLImageElement | null,
+    format: 'image/png',
+    quality: 90,
+    width: 0,
+    height: 0,
+    ratio: 1,
+    dataUrl: null as string | null
+  };
+
+  const dropZoneRes = document.getElementById('dropZoneRes');
+  const fileInputRes = document.getElementById('fileInputRes') as HTMLInputElement;
+  const fileNameRes = document.getElementById('fileNameRes');
+  const emptyStateRes = document.getElementById('emptyStateRes');
+  const previewContainerRes = document.getElementById('previewContainerRes');
+  const previewImgRes = document.getElementById('previewImgRes') as HTMLImageElement;
+  const downloadBtnRes = document.getElementById('downloadBtnRes') as HTMLButtonElement;
+  
+  const resWidth = document.getElementById('resWidth') as HTMLInputElement;
+  const resHeight = document.getElementById('resHeight') as HTMLInputElement;
+  const resKeepRatio = document.getElementById('resKeepRatio') as HTMLInputElement;
+  
+  const resFormat = document.getElementById('resFormat') as HTMLSelectElement;
+  const resQualityGroup = document.getElementById('resQualityGroup');
+  const resQuality = document.getElementById('resQuality') as HTMLInputElement;
+  const resQualityVal = document.getElementById('resQualityVal');
+  
+  const resStats = document.getElementById('resStats');
+  const statOrigRes = document.getElementById('statOrigRes');
+  const statNewRes = document.getElementById('statNewRes');
+
+  const loadingOverlayRes = document.getElementById('loadingOverlayRes');
+  const overlayTextRes = document.getElementById('overlayTextRes');
+
+  let resTimer: number | null = null;
+  let objectUrl: string | null = null;
+  let isUpdatingDimensions = false; // Prevent recursive updates
+
+  if (dropZoneRes && fileInputRes) {
+    dropZoneRes.addEventListener('click', () => fileInputRes.click());
+    dropZoneRes.addEventListener('dragover', (e) => { e.preventDefault(); dropZoneRes.classList.add('dragover'); });
+    dropZoneRes.addEventListener('dragleave', () => dropZoneRes.classList.remove('dragover'));
+    dropZoneRes.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZoneRes.classList.remove('dragover');
+      if (e.dataTransfer?.files && e.dataTransfer.files[0]) handleFileRes(e.dataTransfer.files[0]);
+    });
+    fileInputRes.addEventListener('change', (e) => {
+      const target = e.target as HTMLInputElement;
+      if (target.files && target.files[0]) handleFileRes(target.files[0]);
+    });
+  }
+
+  // Dimension Handlers
+  resWidth?.addEventListener('input', (e) => {
+    if (isUpdatingDimensions || !stateRes.image) return;
+    const val = parseInt((e.target as HTMLInputElement).value) || 0;
+    stateRes.width = val;
+    if (resKeepRatio?.checked && val > 0) {
+      isUpdatingDimensions = true;
+      stateRes.height = Math.round(val / stateRes.ratio);
+      resHeight.value = stateRes.height.toString();
+      isUpdatingDimensions = false;
+    }
+    triggerResize();
+  });
+
+  resHeight?.addEventListener('input', (e) => {
+    if (isUpdatingDimensions || !stateRes.image) return;
+    const val = parseInt((e.target as HTMLInputElement).value) || 0;
+    stateRes.height = val;
+    if (resKeepRatio?.checked && val > 0) {
+      isUpdatingDimensions = true;
+      stateRes.width = Math.round(val * stateRes.ratio);
+      resWidth.value = stateRes.width.toString();
+      isUpdatingDimensions = false;
+    }
+    triggerResize();
+  });
+
+  resFormat?.addEventListener('change', (e) => {
+    stateRes.format = (e.target as HTMLSelectElement).value;
+    if (resQualityGroup) {
+      if (stateRes.format === 'image/jpeg' || stateRes.format === 'image/webp') {
+        resQualityGroup.style.display = 'block';
+      } else {
+        resQualityGroup.style.display = 'none';
+      }
+    }
+    triggerResize();
+  });
+
+  resQuality?.addEventListener('input', (e) => {
+    stateRes.quality = parseInt((e.target as HTMLInputElement).value);
+    if(resQualityVal) resQualityVal.textContent = stateRes.quality + '%';
+    triggerResize();
+  });
+
+  downloadBtnRes?.addEventListener('click', () => {
+    if (!stateRes.dataUrl || !stateRes.file) return;
+    const link = document.createElement('a');
+    let ext = 'png';
+    if (stateRes.format === 'image/jpeg') ext = 'jpg';
+    if (stateRes.format === 'image/webp') ext = 'webp';
+    
+    const origParts = stateRes.file.name.split('.');
+    const origName = origParts.length > 1 ? origParts.slice(0, -1).join('.') : stateRes.file.name;
+    
+    link.download = `${origName}_${stateRes.width}x${stateRes.height}.${ext}`;
+    link.href = stateRes.dataUrl;
+    link.click();
+  });
+
+  function showLoading() {
+    if(!loadingOverlayRes || !overlayTextRes) return;
+    loadingOverlayRes.className = 'overlay';
+    overlayTextRes.textContent = 'Procesando...';
+  }
+
+  function showSuccess() {
+    if(!loadingOverlayRes || !overlayTextRes) return;
+    loadingOverlayRes.className = 'overlay overlay-success';
+    overlayTextRes.textContent = '¡Listo para descargar!';
+    setTimeout(() => {
+      loadingOverlayRes.classList.add('hidden');
+    }, 1200);
+  }
+
+  function triggerResize() {
+    if (resTimer) clearTimeout(resTimer);
+    resTimer = setTimeout(() => {
+      showLoading();
+      renderResize();
+    }, 300) as any;
+  }
+
+  function handleFileRes(file: File) {
+    if (!file.type.startsWith('image/')) return;
+    stateRes.file = file;
+    if(fileNameRes) {
+      fileNameRes.textContent = file.name;
+      fileNameRes.classList.remove('hidden');
+    }
+    const uploadText = dropZoneRes?.querySelector('.upload-text');
+    if(uploadText) uploadText.textContent = 'Cambiar imagen cargada';
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        stateRes.image = img;
+        stateRes.width = img.width;
+        stateRes.height = img.height;
+        stateRes.ratio = img.width / img.height;
+        
+        isUpdatingDimensions = true;
+        resWidth.value = img.width.toString();
+        resHeight.value = img.height.toString();
+        isUpdatingDimensions = false;
+
+        emptyStateRes?.classList.add('hidden');
+        previewContainerRes?.classList.remove('hidden');
+        resStats?.classList.remove('hidden');
+        if(downloadBtnRes) downloadBtnRes.disabled = false;
+        
+        triggerResize();
+      };
+      img.src = e.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function formatBytes(bytes: number) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  }
+
+  function renderResize() {
+    if (!stateRes.image || !previewImgRes || stateRes.width <= 0 || stateRes.height <= 0) return;
+    
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = stateRes.width;
+    tempCanvas.height = stateRes.height;
+    const tempCtx = tempCanvas.getContext('2d');
+    
+    if (stateRes.format === 'image/jpeg') {
+        tempCtx!.fillStyle = '#ffffff';
+        tempCtx!.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+    }
+    
+    // Smooth image rendering
+    if (tempCtx) {
+      tempCtx.imageSmoothingEnabled = true;
+      tempCtx.imageSmoothingQuality = 'high';
+      tempCtx.drawImage(stateRes.image, 0, 0, stateRes.width, stateRes.height);
+    }
+
+    tempCanvas.toBlob((blob) => {
+      if (!blob || !stateRes.file) return;
+      
+      setTimeout(() => {
+        if (objectUrl) URL.revokeObjectURL(objectUrl);
+        
+        objectUrl = URL.createObjectURL(blob);
+        stateRes.dataUrl = objectUrl;
+        previewImgRes.src = objectUrl;
+
+        const origBytes = stateRes.file.size;
+        const newBytes = blob.size;
+        
+        if(statOrigRes) statOrigRes.textContent = formatBytes(origBytes);
+        if(statNewRes) statNewRes.textContent = formatBytes(newBytes);
+        
+        showSuccess();
+      }, 500);
+      
+    }, stateRes.format, stateRes.quality / 100);
+  }
+</script>
