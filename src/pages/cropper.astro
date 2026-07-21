@@ -2,6 +2,7 @@
 import Layout from '../layouts/Layout.astro';
 import Sidebar from '../components/Sidebar.astro';
 import Topbar from '../components/Topbar.astro';
+import 'cropperjs/dist/cropper.css';
 ---
 
 <Layout title="Recortar Imagen">
@@ -62,8 +63,6 @@ import Topbar from '../components/Topbar.astro';
 </Layout>
 
 <style>
-  @import 'cropperjs/dist/cropper.css';
-  
   .segment-btn {
     padding: 8px;
     font-size: 13px;
