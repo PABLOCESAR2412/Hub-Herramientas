@@ -1,0 +1,268 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Sidebar from '../components/Sidebar.astro';
+import Topbar from '../components/Topbar.astro';
+---
+
+<Layout title="Convertir Formato">
+  <Sidebar />
+  <main class="main-content">
+    <Topbar 
+      title="Convertir Formato" 
+      desc="&mdash; Convierte imágenes entre formatos PNG, JPEG y WebP localmente." 
+    />
+    
+    <div class="workspace">
+      <div class="workspace-view" id="viewConverter">
+        <aside class="controls-panel">
+          
+          <div class="upload-zone" id="dropZoneConv">
+            <div class="upload-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+            </div>
+            <div class="upload-text">Click o arrastra tu imagen aquí</div>
+            <div class="upload-filename hidden" id="fileNameConv"></div>
+            <input type="file" id="fileInputConv" accept="image/*" class="hidden">
+          </div>
+
+          <div class="control-group">
+            <div class="control-header">
+              <label class="control-label">Formato de Salida</label>
+            </div>
+            <select id="convFormat">
+              <option value="image/png">PNG</option>
+              <option value="image/jpeg">JPEG</option>
+              <option value="image/webp">WebP</option>
+            </select>
+          </div>
+
+          <div class="control-group" id="qualityControlGroup" style="display: none;">
+            <div class="control-header">
+              <label class="control-label">Calidad</label>
+              <span class="control-val" id="qualityValConv">90%</span>
+            </div>
+            <input type="range" id="convQuality" min="1" max="100" value="90">
+          </div>
+
+          <div class="stats-card hidden" id="convStats">
+            <div class="stats-row">
+              <span class="stats-label">Formato Original:</span>
+              <span class="stats-val" id="statOrigFmt">--</span>
+            </div>
+            <div class="stats-row">
+              <span class="stats-label">Tamaño Original:</span>
+              <span class="stats-val" id="statOrigSize">--</span>
+            </div>
+            <div class="stats-row">
+              <span class="stats-label">Nuevo Tamaño:</span>
+              <span class="stats-val highlight" id="statConvSize">--</span>
+            </div>
+          </div>
+
+          <button id="downloadBtnConv" class="btn-primary" disabled>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            Convertir y Descargar
+          </button>
+
+        </aside>
+
+        <section class="preview-area" id="previewAreaConv">
+          <div class="empty-state" id="emptyStateConv">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+            <div>Sube una imagen para convertirla</div>
+          </div>
+          <div class="preview-container hidden" id="previewContainerConv">
+            <img id="previewImgConv" />
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+</Layout>
+
+<style>
+/* Stats Card (for converter) */
+.stats-card {
+  background: var(--bg-base);
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  margin-bottom: 24px;
+}
+.stats-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.stats-row:last-child {
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+  margin-top: 4px;
+  margin-bottom: 0;
+}
+.stats-label { color: var(--text-secondary); font-size: 13px; }
+.stats-val { font-family: var(--font-mono); font-size: 13px; color: var(--text-main); }
+.stats-val.highlight { color: var(--accent); font-weight: bold; }
+</style>
+
+<script>
+  const stateConv = {
+    file: null as File | null,
+    image: null as HTMLImageElement | null,
+    format: 'image/png',
+    quality: 90,
+    dataUrl: null as string | null
+  };
+
+  const dropZoneConv = document.getElementById('dropZoneConv');
+  const fileInputConv = document.getElementById('fileInputConv');
+  const fileNameConv = document.getElementById('fileNameConv');
+  const emptyStateConv = document.getElementById('emptyStateConv');
+  const previewContainerConv = document.getElementById('previewContainerConv');
+  const previewImgConv = document.getElementById('previewImgConv') as HTMLImageElement;
+  const downloadBtnConv = document.getElementById('downloadBtnConv') as HTMLButtonElement;
+  
+  const convFormat = document.getElementById('convFormat') as HTMLSelectElement;
+  const qualityControlGroup = document.getElementById('qualityControlGroup');
+  const convQuality = document.getElementById('convQuality') as HTMLInputElement;
+  const qualityValConv = document.getElementById('qualityValConv');
+  
+  const convStats = document.getElementById('convStats');
+  const statOrigFmt = document.getElementById('statOrigFmt');
+  const statOrigSize = document.getElementById('statOrigSize');
+  const statConvSize = document.getElementById('statConvSize');
+
+  let conversionTimer: number | null = null;
+  let objectUrl: string | null = null;
+
+  if (dropZoneConv && fileInputConv) {
+    dropZoneConv.addEventListener('click', () => fileInputConv.click());
+    dropZoneConv.addEventListener('dragover', (e) => { e.preventDefault(); dropZoneConv.classList.add('dragover'); });
+    dropZoneConv.addEventListener('dragleave', () => dropZoneConv.classList.remove('dragover'));
+    dropZoneConv.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZoneConv.classList.remove('dragover');
+      if (e.dataTransfer?.files && e.dataTransfer.files[0]) handleFileConv(e.dataTransfer.files[0]);
+    });
+    fileInputConv.addEventListener('change', (e) => {
+      const target = e.target as HTMLInputElement;
+      if (target.files && target.files[0]) handleFileConv(target.files[0]);
+    });
+  }
+
+  convFormat?.addEventListener('change', (e) => {
+    stateConv.format = (e.target as HTMLSelectElement).value;
+    
+    // Solo mostramos calidad para JPEG o WebP
+    if (qualityControlGroup) {
+      if (stateConv.format === 'image/jpeg' || stateConv.format === 'image/webp') {
+        qualityControlGroup.style.display = 'block';
+      } else {
+        qualityControlGroup.style.display = 'none';
+      }
+    }
+    
+    triggerConversion();
+  });
+
+  convQuality?.addEventListener('input', (e) => { 
+    stateConv.quality = parseInt((e.target as HTMLInputElement).value); 
+    if(qualityValConv) qualityValConv.textContent = stateConv.quality + '%'; 
+    triggerConversion(); 
+  });
+
+  downloadBtnConv?.addEventListener('click', () => {
+    if (!stateConv.dataUrl || !stateConv.file) return;
+    const link = document.createElement('a');
+    let ext = 'png';
+    if (stateConv.format === 'image/jpeg') ext = 'jpg';
+    if (stateConv.format === 'image/webp') ext = 'webp';
+    
+    const origParts = stateConv.file.name.split('.');
+    const origName = origParts.length > 1 ? origParts.slice(0, -1).join('.') : stateConv.file.name;
+    
+    link.download = `${origName}_convertida.${ext}`;
+    link.href = stateConv.dataUrl;
+    link.click();
+  });
+
+  function triggerConversion() {
+    if (conversionTimer) clearTimeout(conversionTimer);
+    conversionTimer = setTimeout(() => {
+      renderConversion();
+    }, 150) as any;
+  }
+
+  function handleFileConv(file: File) {
+    if (!file.type.startsWith('image/')) return;
+    stateConv.file = file;
+    if(fileNameConv) {
+      fileNameConv.textContent = file.name;
+      fileNameConv.classList.remove('hidden');
+    }
+    const uploadText = dropZoneConv?.querySelector('.upload-text');
+    if(uploadText) uploadText.textContent = 'Cambiar imagen cargada';
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        stateConv.image = img;
+        emptyStateConv?.classList.add('hidden');
+        previewContainerConv?.classList.remove('hidden');
+        convStats?.classList.remove('hidden');
+        if(downloadBtnConv) downloadBtnConv.disabled = false;
+        
+        if (statOrigFmt) {
+          const type = file.type.split('/')[1] || 'desconocido';
+          statOrigFmt.textContent = type.toUpperCase();
+        }
+        
+        triggerConversion();
+      };
+      img.src = e.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function formatBytes(bytes: number) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  }
+
+  function renderConversion() {
+    if (!stateConv.image || !previewImgConv) return;
+    
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = stateConv.image.width;
+    tempCanvas.height = stateConv.image.height;
+    const tempCtx = tempCanvas.getContext('2d');
+    
+    // Rellenamos de blanco en caso de pasar PNG transparente a JPEG
+    if (stateConv.format === 'image/jpeg') {
+        tempCtx!.fillStyle = '#ffffff';
+        tempCtx!.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+    }
+    tempCtx?.drawImage(stateConv.image, 0, 0);
+
+    tempCanvas.toBlob((blob) => {
+      if (!blob || !stateConv.file) return;
+      
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      
+      objectUrl = URL.createObjectURL(blob);
+      stateConv.dataUrl = objectUrl;
+      previewImgConv.src = objectUrl;
+
+      const origBytes = stateConv.file.size;
+      const convBytes = blob.size;
+      
+      if(statOrigSize) statOrigSize.textContent = formatBytes(origBytes);
+      if(statConvSize) statConvSize.textContent = formatBytes(convBytes);
+      
+    }, stateConv.format, stateConv.quality / 100);
+  }
+</script>

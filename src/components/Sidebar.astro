@@ -18,13 +18,13 @@ const currentPath = Astro.url.pathname;
     <a href="/compressor" class={`nav-item ${currentPath === '/compressor' ? 'active' : ''}`}>
       Comprimir Imagen
     </a>
+    <a href="/converter" class={`nav-item ${currentPath === '/converter' ? 'active' : ''}`}>
+      Convertir Formato
+    </a>
   </div>
 
   <div class="nav-section">
     <div class="nav-title">Próximamente</div>
-    <a href="#" class="nav-item disabled">
-      Convertir Formato <span class="badge">Pronto</span>
-    </a>
     <a href="#" class="nav-item disabled">
       Redimensionar <span class="badge">Pronto</span>
     </a>
