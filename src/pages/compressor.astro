@@ -1,0 +1,265 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Sidebar from '../components/Sidebar.astro';
+import Topbar from '../components/Topbar.astro';
+---
+
+<Layout title="Comprimir Imagen">
+  <Sidebar />
+  <main class="main-content">
+    <Topbar 
+      title="Comprimir Imagen" 
+      desc="&mdash; Reduce el peso de tus imágenes sin perder calidad visual (100% offline)." 
+    />
+    
+    <div class="workspace">
+      <div class="workspace-view" id="viewCompressor">
+        <aside class="controls-panel">
+          
+          <div class="upload-zone" id="dropZoneComp">
+            <div class="upload-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+            </div>
+            <div class="upload-text">Click o arrastra tu imagen aquí</div>
+            <div class="upload-filename hidden" id="fileNameComp"></div>
+            <input type="file" id="fileInputComp" accept="image/*" class="hidden">
+          </div>
+
+          <div class="control-group">
+            <div class="control-header">
+              <label class="control-label">Calidad</label>
+              <span class="control-val" id="qualityValComp">80%</span>
+            </div>
+            <input type="range" id="compQuality" min="1" max="100" value="80">
+          </div>
+
+          <div class="control-group">
+            <div class="control-header">
+              <label class="control-label">Formato</label>
+            </div>
+            <div class="segmented">
+              <button class="segment-btn active" data-fmt="image/webp" id="fmtWebp">WebP</button>
+              <button class="segment-btn" data-fmt="image/jpeg" id="fmtJpeg">JPEG</button>
+            </div>
+          </div>
+
+          <div class="stats-card hidden" id="compStats">
+            <div class="stats-row">
+              <span class="stats-label">Original:</span>
+              <span class="stats-val" id="statOrig">--</span>
+            </div>
+            <div class="stats-row">
+              <span class="stats-label">Comprimida:</span>
+              <span class="stats-val highlight" id="statComp">--</span>
+            </div>
+            <div class="stats-row">
+              <span class="stats-label">Ahorro:</span>
+              <span class="stats-val good" id="statDiff">--</span>
+            </div>
+          </div>
+
+          <button id="downloadBtnComp" class="btn-primary" disabled>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            Descargar <span id="dlFmtTxt">WebP</span>
+          </button>
+
+        </aside>
+
+        <section class="preview-area" id="previewAreaComp">
+          <div class="empty-state" id="emptyStateComp">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+            <div>Sube una imagen para comprimir</div>
+          </div>
+          <div class="preview-container hidden" id="previewContainerComp">
+            <img id="previewImgComp" />
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+</Layout>
+
+<style>
+/* Stats Card (for compressor) */
+.stats-card {
+  background: var(--bg-base);
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  margin-bottom: 24px;
+}
+.stats-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.stats-row:last-child {
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+  margin-top: 4px;
+  margin-bottom: 0;
+}
+.stats-label { color: var(--text-secondary); font-size: 13px; }
+.stats-val { font-family: var(--font-mono); font-size: 13px; color: var(--text-main); }
+.stats-val.highlight { color: var(--accent); font-weight: bold; }
+.stats-val.good { color: #48BB78; font-weight: bold; }
+.stats-val.bad { color: #F56565; font-weight: bold; }
+</style>
+
+<script>
+  const stateComp = {
+    file: null as File | null,
+    image: null as HTMLImageElement | null,
+    quality: 80,
+    format: 'image/webp',
+    dataUrl: null as string | null
+  };
+
+  const dropZoneComp = document.getElementById('dropZoneComp');
+  const fileInputComp = document.getElementById('fileInputComp');
+  const fileNameComp = document.getElementById('fileNameComp');
+  const emptyStateComp = document.getElementById('emptyStateComp');
+  const previewContainerComp = document.getElementById('previewContainerComp');
+  const previewImgComp = document.getElementById('previewImgComp') as HTMLImageElement;
+  const downloadBtnComp = document.getElementById('downloadBtnComp') as HTMLButtonElement;
+  
+  const compQuality = document.getElementById('compQuality') as HTMLInputElement;
+  const qualityValComp = document.getElementById('qualityValComp');
+  const fmtWebp = document.getElementById('fmtWebp');
+  const fmtJpeg = document.getElementById('fmtJpeg');
+  const dlFmtTxt = document.getElementById('dlFmtTxt');
+  
+  const compStats = document.getElementById('compStats');
+  const statOrig = document.getElementById('statOrig');
+  const statComp = document.getElementById('statComp');
+  const statDiff = document.getElementById('statDiff');
+
+  if (dropZoneComp && fileInputComp) {
+    dropZoneComp.addEventListener('click', () => fileInputComp.click());
+    dropZoneComp.addEventListener('dragover', (e) => { e.preventDefault(); dropZoneComp.classList.add('dragover'); });
+    dropZoneComp.addEventListener('dragleave', () => dropZoneComp.classList.remove('dragover'));
+    dropZoneComp.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZoneComp.classList.remove('dragover');
+      if (e.dataTransfer?.files && e.dataTransfer.files[0]) handleFileComp(e.dataTransfer.files[0]);
+    });
+    fileInputComp.addEventListener('change', (e) => {
+      const target = e.target as HTMLInputElement;
+      if (target.files && target.files[0]) handleFileComp(target.files[0]);
+    });
+  }
+
+  let compressionTimer: number | null = null;
+  let objectUrl: string | null = null;
+
+  compQuality?.addEventListener('input', (e) => { 
+    stateComp.quality = parseInt((e.target as HTMLInputElement).value); 
+    if(qualityValComp) qualityValComp.textContent = stateComp.quality + '%'; 
+    
+    if (compressionTimer) clearTimeout(compressionTimer);
+    compressionTimer = setTimeout(() => {
+      renderCompression();
+    }, 150) as any;
+  });
+
+  fmtWebp?.addEventListener('click', () => {
+    stateComp.format = 'image/webp';
+    fmtWebp.classList.add('active'); fmtJpeg?.classList.remove('active');
+    if(dlFmtTxt) dlFmtTxt.textContent = 'WebP';
+    renderCompression();
+  });
+  fmtJpeg?.addEventListener('click', () => {
+    stateComp.format = 'image/jpeg';
+    fmtJpeg.classList.add('active'); fmtWebp?.classList.remove('active');
+    if(dlFmtTxt) dlFmtTxt.textContent = 'JPEG';
+    renderCompression();
+  });
+
+  downloadBtnComp?.addEventListener('click', () => {
+    if (!stateComp.dataUrl || !stateComp.file) return;
+    const link = document.createElement('a');
+    const ext = stateComp.format === 'image/webp' ? 'webp' : 'jpg';
+    const origParts = stateComp.file.name.split('.');
+    const origName = origParts.length > 1 ? origParts.slice(0, -1).join('.') : stateComp.file.name;
+    
+    link.download = `${origName}_comprimida.${ext}`;
+    link.href = stateComp.dataUrl;
+    link.click();
+  });
+
+  function handleFileComp(file: File) {
+    if (!file.type.startsWith('image/')) return;
+    stateComp.file = file;
+    if(fileNameComp) {
+      fileNameComp.textContent = file.name;
+      fileNameComp.classList.remove('hidden');
+    }
+    const uploadText = dropZoneComp?.querySelector('.upload-text');
+    if(uploadText) uploadText.textContent = 'Cambiar imagen cargada';
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        stateComp.image = img;
+        emptyStateComp?.classList.add('hidden');
+        previewContainerComp?.classList.remove('hidden');
+        compStats?.classList.remove('hidden');
+        if(downloadBtnComp) downloadBtnComp.disabled = false;
+        renderCompression();
+      };
+      img.src = e.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function formatBytes(bytes: number) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  }
+
+  function renderCompression() {
+    if (!stateComp.image || !previewImgComp) return;
+    
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = stateComp.image.width;
+    tempCanvas.height = stateComp.image.height;
+    const tempCtx = tempCanvas.getContext('2d');
+    tempCtx?.drawImage(stateComp.image, 0, 0);
+
+    tempCanvas.toBlob((blob) => {
+      if (!blob || !stateComp.file) return;
+      
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      
+      objectUrl = URL.createObjectURL(blob);
+      stateComp.dataUrl = objectUrl;
+      previewImgComp.src = objectUrl;
+
+      const origBytes = stateComp.file.size;
+      const compBytes = blob.size;
+      
+      const diff = origBytes - compBytes;
+      const pct = Math.round((diff / origBytes) * 100);
+
+      if(statOrig) statOrig.textContent = formatBytes(origBytes);
+      if(statComp) statComp.textContent = formatBytes(compBytes);
+      
+      if (statDiff) {
+        if (pct > 0) {
+          statDiff.textContent = `-${pct}%`;
+          statDiff.className = 'stats-val good';
+        } else if (pct < 0) {
+          statDiff.textContent = `+${Math.abs(pct)}%`;
+          statDiff.className = 'stats-val bad';
+        } else {
+          statDiff.textContent = `0%`;
+          statDiff.className = 'stats-val';
+        }
+      }
+    }, stateComp.format, stateComp.quality / 100);
+  }
+</script>

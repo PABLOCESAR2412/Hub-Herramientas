@@ -1,0 +1,39 @@
+---
+interface Props {
+  title: string;
+  desc: string;
+}
+
+const { title, desc } = Astro.props;
+---
+
+<header class="topbar">
+  <div class="topbar-title">
+    {title}
+    <span class="topbar-desc" set:html={desc}></span>
+  </div>
+</header>
+
+<style>
+.topbar {
+  height: 60px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  flex-shrink: 0;
+  background-color: var(--bg-base);
+}
+.topbar-title {
+  font-weight: 500;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.topbar-desc {
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 400;
+}
+</style>
