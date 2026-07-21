@@ -27,16 +27,10 @@ import Topbar from '../components/Topbar.astro';
             <input type="file" id="fileInputCol" accept="image/*" class="hidden">
           </div>
 
-          <div class="control-group">
-            <div class="control-header">
-              <label class="control-label">Paleta Generada</label>
-            </div>
-            <div id="paletteContainer" class="palette-grid hidden">
-              <!-- Colors will be injected here via JS -->
-            </div>
-            <div id="paletteEmpty" class="palette-empty">
-              Sube una imagen para ver los colores
-            </div>
+          <div style="margin-top: 24px; font-size: 13px; color: var(--text-tertiary); padding: 16px; background: rgba(0,0,0,0.2); border-radius: 8px; line-height: 1.6;">
+            <strong>Instrucciones</strong><br><br>
+            Sube tu imagen y los colores predominantes se mostrarán directamente en grande a la derecha.<br><br>
+            Haz clic sobre cualquier bloque de color para copiar su código al portapapeles.
           </div>
 
         </aside>
@@ -47,8 +41,13 @@ import Topbar from '../components/Topbar.astro';
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
             <div>Sube una imagen para analizarla</div>
           </div>
-          <div class="preview-container hidden" id="previewContainerCol" style="position: relative;">
-            <img id="previewImgCol" />
+          <div class="preview-container hidden" id="previewContainerCol" style="position: relative; display: flex; flex-direction: column; padding: 0;">
+            <div style="flex-grow: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 24px; background: var(--bg-base);">
+              <img id="previewImgCol" style="max-height: 100%; max-width: 100%; object-fit: contain; border-radius: 8px; box-shadow: 0 4px 24px rgba(0,0,0,0.2);" />
+            </div>
+            <div id="directPalette" style="display: flex; height: 160px; width: 100%; border-top: 1px solid var(--border);">
+              <!-- Colors will be injected here directly -->
+            </div>
             <div id="loadingOverlayCol" class="overlay hidden">
               <div class="spinner"></div>
               <div class="overlay-text" id="overlayTextCol">Analizando colores...</div>
@@ -142,8 +141,7 @@ import Topbar from '../components/Topbar.astro';
   const loadingOverlayCol = document.getElementById('loadingOverlayCol');
   const overlayTextCol = document.getElementById('overlayTextCol');
 
-  const paletteContainer = document.getElementById('paletteContainer');
-  const paletteEmpty = document.getElementById('paletteEmpty');
+  const directPalette = document.getElementById('directPalette');
 
   if (dropZoneCol && fileInputCol) {
     dropZoneCol.addEventListener('click', () => fileInputCol.click());
@@ -271,43 +269,61 @@ import Topbar from '../components/Topbar.astro';
   }
 
   function renderPalette(colors: {r: number, g: number, b: number}[]) {
-    if (!paletteContainer || !paletteEmpty) return;
+    if (!directPalette) return;
     
-    paletteEmpty.classList.add('hidden');
-    paletteContainer.classList.remove('hidden');
-    paletteContainer.innerHTML = '';
+    directPalette.innerHTML = '';
 
     colors.forEach(c => {
       const hex = rgbToHex(c.r, c.g, c.b);
       const rgb = `rgb(${c.r}, ${c.g}, ${c.b})`;
       
-      const card = document.createElement('div');
-      card.className = 'color-card';
-      card.innerHTML = `
-        <div class="color-swatch" style="background-color: ${hex}"></div>
-        <div class="color-info">
-          <div class="color-hex" title="Copiar HEX" data-val="${hex}">
-            ${hex}
-            <svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-          </div>
-          <div class="color-rgb">${rgb}</div>
-        </div>
+      // Calculate brightness to determine text color (black or white)
+      const brightness = (c.r * 299 + c.g * 587 + c.b * 114) / 1000;
+      const textColor = brightness > 128 ? '#000000' : '#ffffff';
+      const textOpacity = brightness > 128 ? '0.6' : '0.8';
+      
+      const strip = document.createElement('div');
+      strip.style.cssText = `
+        background-color: ${hex};
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: ${textColor};
+        cursor: pointer;
+        transition: flex 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
       `;
       
-      // Funcionalidad de copiar
-      const hexEl = card.querySelector('.color-hex') as HTMLElement;
-      hexEl.addEventListener('click', () => {
-        navigator.clipboard.writeText(hexEl.dataset.val || '');
+      strip.innerHTML = `
+        <span class="color-hex-text" style="font-family: var(--font-mono); font-size: 18px; font-weight: 700; margin-bottom: 4px; pointer-events: none;">${hex}</span>
+        <span style="font-family: var(--font-mono); font-size: 12px; opacity: ${textOpacity}; pointer-events: none;">${rgb}</span>
+      `;
+      
+      // Hover effect to expand the strip slightly
+      strip.addEventListener('mouseenter', () => { strip.style.flex = '1.2'; });
+      strip.addEventListener('mouseleave', () => { strip.style.flex = '1'; });
+      
+      // Copy functionality
+      strip.addEventListener('click', () => {
+        navigator.clipboard.writeText(hex);
         
-        // Feedback visual temporal
-        const originalHtml = hexEl.innerHTML;
-        hexEl.innerHTML = `<span style="color:#48BB78">¡Copiado!</span>`;
+        const hexText = strip.querySelector('.color-hex-text') as HTMLElement;
+        const originalHtml = hexText.innerHTML;
+        hexText.innerHTML = `¡Copiado!`;
+        
+        // Add a subtle flash effect
+        strip.style.opacity = '0.7';
+        setTimeout(() => strip.style.opacity = '1', 100);
+        
         setTimeout(() => {
-          hexEl.innerHTML = originalHtml;
+          hexText.innerHTML = originalHtml;
         }, 1000);
       });
       
-      paletteContainer.appendChild(card);
+      directPalette.appendChild(strip);
     });
   }
 </script>
