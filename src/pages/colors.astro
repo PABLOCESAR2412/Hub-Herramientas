@@ -1,0 +1,313 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Sidebar from '../components/Sidebar.astro';
+import Topbar from '../components/Topbar.astro';
+---
+
+<Layout title="Extraer Colores">
+  <Sidebar />
+  <main class="main-content">
+    <Topbar 
+      title="Extractor de Paleta de Colores" 
+      desc="&mdash; Sube una imagen para obtener automáticamente sus colores predominantes en formato HEX y RGB." 
+    />
+    
+    <div class="workspace">
+      <div class="workspace-view" id="viewColors">
+        
+        <!-- Left Panel: Colors and Controls -->
+        <aside class="controls-panel">
+          
+          <div class="upload-zone" id="dropZoneCol">
+            <div class="upload-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+            </div>
+            <div class="upload-text">Click o arrastra tu imagen aquí</div>
+            <div class="upload-filename hidden" id="fileNameCol"></div>
+            <input type="file" id="fileInputCol" accept="image/*" class="hidden">
+          </div>
+
+          <div class="control-group">
+            <div class="control-header">
+              <label class="control-label">Paleta Generada</label>
+            </div>
+            <div id="paletteContainer" class="palette-grid hidden">
+              <!-- Colors will be injected here via JS -->
+            </div>
+            <div id="paletteEmpty" class="palette-empty">
+              Sube una imagen para ver los colores
+            </div>
+          </div>
+
+        </aside>
+
+        <!-- Right Panel: Image Preview -->
+        <section class="preview-area" id="previewAreaCol">
+          <div class="empty-state" id="emptyStateCol">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+            <div>Sube una imagen para analizarla</div>
+          </div>
+          <div class="preview-container hidden" id="previewContainerCol" style="position: relative;">
+            <img id="previewImgCol" />
+            <div id="loadingOverlayCol" class="overlay hidden">
+              <div class="spinner"></div>
+              <div class="overlay-text" id="overlayTextCol">Analizando colores...</div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+</Layout>
+
+<style>
+.palette-empty {
+  text-align: center;
+  padding: 32px 16px;
+  background: var(--bg-panel);
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  color: var(--text-tertiary);
+  font-size: 13px;
+}
+.palette-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.color-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--bg-panel);
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  transition: transform 0.2s, border-color 0.2s;
+}
+.color-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+.color-swatch {
+  width: 48px;
+  height: 48px;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.1);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  flex-shrink: 0;
+}
+.color-info {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.color-hex {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-main);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.color-hex:hover { color: var(--accent); }
+.color-rgb {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+.copy-icon {
+  width: 14px;
+  height: 14px;
+  opacity: 0.5;
+}
+.color-hex:hover .copy-icon { opacity: 1; }
+</style>
+
+<script>
+  const stateCol = {
+    image: null as HTMLImageElement | null
+  };
+
+  const dropZoneCol = document.getElementById('dropZoneCol');
+  const fileInputCol = document.getElementById('fileInputCol') as HTMLInputElement;
+  const fileNameCol = document.getElementById('fileNameCol');
+  const emptyStateCol = document.getElementById('emptyStateCol');
+  const previewContainerCol = document.getElementById('previewContainerCol');
+  const previewImgCol = document.getElementById('previewImgCol') as HTMLImageElement;
+  
+  const loadingOverlayCol = document.getElementById('loadingOverlayCol');
+  const overlayTextCol = document.getElementById('overlayTextCol');
+
+  const paletteContainer = document.getElementById('paletteContainer');
+  const paletteEmpty = document.getElementById('paletteEmpty');
+
+  if (dropZoneCol && fileInputCol) {
+    dropZoneCol.addEventListener('click', () => fileInputCol.click());
+    dropZoneCol.addEventListener('dragover', (e) => { e.preventDefault(); dropZoneCol.classList.add('dragover'); });
+    dropZoneCol.addEventListener('dragleave', () => dropZoneCol.classList.remove('dragover'));
+    dropZoneCol.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZoneCol.classList.remove('dragover');
+      if (e.dataTransfer?.files && e.dataTransfer.files[0]) handleFileCol(e.dataTransfer.files[0]);
+    });
+    fileInputCol.addEventListener('change', (e) => {
+      const target = e.target as HTMLInputElement;
+      if (target.files && target.files[0]) handleFileCol(target.files[0]);
+    });
+  }
+
+  function showLoading() {
+    if(!loadingOverlayCol || !overlayTextCol) return;
+    loadingOverlayCol.className = 'overlay';
+    overlayTextCol.textContent = 'Analizando colores...';
+  }
+
+  function hideLoading() {
+    if(!loadingOverlayCol) return;
+    loadingOverlayCol.classList.add('hidden');
+  }
+
+  function handleFileCol(file: File) {
+    if (!file.type.startsWith('image/')) return;
+    if(fileNameCol) {
+      fileNameCol.textContent = file.name;
+      fileNameCol.classList.remove('hidden');
+    }
+    const uploadText = dropZoneCol?.querySelector('.upload-text');
+    if(uploadText) uploadText.textContent = 'Cambiar imagen cargada';
+    
+    showLoading();
+    emptyStateCol?.classList.add('hidden');
+    previewContainerCol?.classList.remove('hidden');
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        stateCol.image = img;
+        previewImgCol.src = img.src;
+        
+        // Timeout para permitir que la UI pinte la imagen y el loading
+        setTimeout(() => {
+          extractColors(img);
+        }, 100);
+      };
+      img.src = e.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function extractColors(img: HTMLImageElement) {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) { hideLoading(); return; }
+
+    // Escalar la imagen a un tamaño pequeño para analizar rápido (ej. 60x60)
+    const size = 60;
+    canvas.width = size;
+    canvas.height = size;
+    ctx.drawImage(img, 0, 0, size, size);
+
+    const imageData = ctx.getImageData(0, 0, size, size);
+    const data = imageData.data;
+    
+    const colorCounts: Record<string, { r: number, g: number, b: number, count: number }> = {};
+    
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      const a = data[i + 3];
+      
+      // Ignorar píxeles transparentes o casi transparentes
+      if (a < 128) continue;
+      
+      // Agrupar colores redondeando (binning)
+      const step = 20;
+      const rB = Math.round(r / step) * step;
+      const gB = Math.round(g / step) * step;
+      const bB = Math.round(b / step) * step;
+      
+      const key = `${rB},${gB},${bB}`;
+      
+      if (!colorCounts[key]) {
+        colorCounts[key] = { r: rB, g: gB, b: bB, count: 0 };
+      }
+      colorCounts[key].count++;
+    }
+
+    // Ordenar por frecuencia
+    const sortedColors = Object.values(colorCounts).sort((a, b) => b.count - a.count);
+    
+    // Filtrar colores muy similares
+    const finalColors = [];
+    for (const c of sortedColors) {
+      if (finalColors.length >= 6) break;
+      let isSimilar = false;
+      for (const fc of finalColors) {
+        const dist = Math.sqrt(Math.pow(c.r - fc.r, 2) + Math.pow(c.g - fc.g, 2) + Math.pow(c.b - fc.b, 2));
+        if (dist < 40) { // Distancia mínima para considerarlo distinto
+          isSimilar = true;
+          break;
+        }
+      }
+      if (!isSimilar) finalColors.push(c);
+    }
+
+    renderPalette(finalColors);
+    hideLoading();
+  }
+
+  function rgbToHex(r: number, g: number, b: number) {
+    const toHex = (c: number) => {
+      const hex = Math.max(0, Math.min(255, c)).toString(16);
+      return hex.length === 1 ? '0' + hex : hex;
+    };
+    return `#${toHex(r)}${toHex(g)}${toHex(b)}`.toUpperCase();
+  }
+
+  function renderPalette(colors: {r: number, g: number, b: number}[]) {
+    if (!paletteContainer || !paletteEmpty) return;
+    
+    paletteEmpty.classList.add('hidden');
+    paletteContainer.classList.remove('hidden');
+    paletteContainer.innerHTML = '';
+
+    colors.forEach(c => {
+      const hex = rgbToHex(c.r, c.g, c.b);
+      const rgb = `rgb(${c.r}, ${c.g}, ${c.b})`;
+      
+      const card = document.createElement('div');
+      card.className = 'color-card';
+      card.innerHTML = `
+        <div class="color-swatch" style="background-color: ${hex}"></div>
+        <div class="color-info">
+          <div class="color-hex" title="Copiar HEX" data-val="${hex}">
+            ${hex}
+            <svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+          </div>
+          <div class="color-rgb">${rgb}</div>
+        </div>
+      `;
+      
+      // Funcionalidad de copiar
+      const hexEl = card.querySelector('.color-hex') as HTMLElement;
+      hexEl.addEventListener('click', () => {
+        navigator.clipboard.writeText(hexEl.dataset.val || '');
+        
+        // Feedback visual temporal
+        const originalHtml = hexEl.innerHTML;
+        hexEl.innerHTML = `<span style="color:#48BB78">¡Copiado!</span>`;
+        setTimeout(() => {
+          hexEl.innerHTML = originalHtml;
+        }, 1000);
+      });
+      
+      paletteContainer.appendChild(card);
+    });
+  }
+</script>
