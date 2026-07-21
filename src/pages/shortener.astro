@@ -1,0 +1,120 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Sidebar from '../components/Sidebar.astro';
+import Topbar from '../components/Topbar.astro';
+---
+
+<Layout title="Acortador de Links">
+  <Sidebar />
+  <main class="main-content">
+    <Topbar 
+      title="Acortador de Links" 
+      desc="&mdash; Convierte URLs largas en enlaces cortos y fáciles de compartir usando is.gd." 
+    />
+    
+    <div class="workspace" style="display: flex; justify-content: center; align-items: flex-start; padding-top: 40px;">
+      
+      <div style="background: var(--bg-base); border: 1px solid var(--border); border-radius: 12px; padding: 32px; width: 100%; max-width: 600px; box-shadow: 0 8px 32px rgba(0,0,0,0.2);">
+        
+        <h2 style="font-size: 20px; font-weight: 600; margin-bottom: 24px; color: var(--text-main);">Pega tu enlace largo aquí</h2>
+        
+        <div style="display: flex; gap: 12px; margin-bottom: 24px;">
+          <input type="url" id="urlInput" placeholder="https://ejemplo.com/una-url-muy-larga-y-dificil-de-leer..." style="flex-grow: 1; padding: 14px 16px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-panel); color: var(--text-main); font-size: 15px; outline: none; transition: border-color 0.2s;">
+          <button id="shortenBtn" class="btn-primary" style="padding: 0 24px; white-space: nowrap;">Acortar Link</button>
+        </div>
+
+        <div id="loadingShortener" class="hidden" style="display: flex; align-items: center; gap: 12px; color: var(--text-secondary); margin-bottom: 24px;">
+          <div class="spinner" style="width: 20px; height: 20px; border-width: 2px; margin-bottom: 0;"></div>
+          Generando enlace corto...
+        </div>
+
+        <div id="errorMsg" class="hidden" style="color: #F56565; font-size: 14px; margin-bottom: 24px; padding: 12px; background: rgba(245, 101, 101, 0.1); border-radius: 8px; border: 1px solid rgba(245, 101, 101, 0.2);">
+          Hubo un error al acortar el enlace. Verifica que la URL sea válida.
+        </div>
+
+        <div id="resultBox" class="hidden" style="background: var(--bg-panel); border: 1px solid var(--border); border-radius: 8px; padding: 24px; text-align: center;">
+          <div style="font-size: 13px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px;">Tu enlace corto</div>
+          <a id="shortLink" href="#" target="_blank" style="display: block; font-size: 24px; font-weight: 600; color: var(--accent); text-decoration: none; margin-bottom: 24px; word-break: break-all;"></a>
+          
+          <button id="copyBtn" class="btn-primary" style="margin: 0 auto; background: var(--bg-base); border: 1px solid var(--border); color: var(--text-main);">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            Copiar al portapapeles
+          </button>
+        </div>
+
+      </div>
+
+    </div>
+  </main>
+</Layout>
+
+<style>
+.spinner {
+  border-top-color: var(--accent);
+  animation: spin 1s ease-in-out infinite;
+}
+input[type="url"]:focus {
+  border-color: var(--accent) !important;
+}
+</style>
+
+<script>
+  const urlInput = document.getElementById('urlInput') as HTMLInputElement;
+  const shortenBtn = document.getElementById('shortenBtn') as HTMLButtonElement;
+  const loadingShortener = document.getElementById('loadingShortener');
+  const resultBox = document.getElementById('resultBox');
+  const shortLink = document.getElementById('shortLink') as HTMLAnchorElement;
+  const copyBtn = document.getElementById('copyBtn') as HTMLButtonElement;
+  const errorMsg = document.getElementById('errorMsg');
+
+  shortenBtn?.addEventListener('click', async () => {
+    let url = urlInput?.value.trim();
+    if (!url) return;
+    
+    // Auto-add https:// if missing to prevent API errors
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = 'https://' + url;
+      urlInput.value = url;
+    }
+
+    if(loadingShortener) loadingShortener.classList.remove('hidden');
+    if(resultBox) resultBox.classList.add('hidden');
+    if(errorMsg) errorMsg.classList.add('hidden');
+    shortenBtn.disabled = true;
+
+    try {
+      const response = await fetch(`https://is.gd/create.php?format=json&url=${encodeURIComponent(url)}`);
+      const data = await response.json();
+      
+      if (data.shorturl) {
+        if(shortLink) {
+          shortLink.textContent = data.shorturl;
+          shortLink.href = data.shorturl;
+        }
+        if(resultBox) resultBox.classList.remove('hidden');
+      } else {
+        if(errorMsg) errorMsg.classList.remove('hidden');
+      }
+    } catch (error) {
+      if(errorMsg) errorMsg.classList.remove('hidden');
+    } finally {
+      if(loadingShortener) loadingShortener.classList.add('hidden');
+      shortenBtn.disabled = false;
+    }
+  });
+
+  urlInput?.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') shortenBtn?.click();
+  });
+
+  copyBtn?.addEventListener('click', () => {
+    if (shortLink?.textContent) {
+      navigator.clipboard.writeText(shortLink.textContent);
+      const origText = copyBtn.innerHTML;
+      copyBtn.innerHTML = `<span style="color:#48BB78; display:flex; align-items:center; gap:8px;">✓ ¡Copiado exitosamente!</span>`;
+      setTimeout(() => {
+        copyBtn.innerHTML = origText;
+      }, 2000);
+    }
+  });
+</script>

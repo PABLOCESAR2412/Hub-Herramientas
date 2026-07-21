@@ -1,0 +1,220 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Sidebar from '../components/Sidebar.astro';
+import Topbar from '../components/Topbar.astro';
+---
+
+<Layout title="Limpiar Metadatos">
+  <Sidebar />
+  <main class="main-content">
+    <Topbar 
+      title="Limpiar Metadatos (EXIF)" 
+      desc="&mdash; Elimina rastros de GPS, modelo de cámara y fecha ocultos en tus fotos para proteger tu privacidad." 
+    />
+    
+    <div class="workspace">
+      <div class="workspace-view" id="viewExif">
+        <aside class="controls-panel">
+          
+          <div class="upload-zone" id="dropZoneExif">
+            <div class="upload-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+            </div>
+            <div class="upload-text">Click o arrastra tu foto aquí</div>
+            <div class="upload-filename hidden" id="fileNameExif"></div>
+            <input type="file" id="fileInputExif" accept="image/jpeg, image/png, image/webp" class="hidden">
+          </div>
+
+          <div class="stats-card hidden" id="exifStats">
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+              <div style="width: 40px; height: 40px; border-radius: 50%; background: rgba(72, 187, 120, 0.2); display: flex; align-items: center; justify-content: center; color: #48BB78;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              </div>
+              <div>
+                <div style="font-weight: 600; color: var(--text-main);">Imagen Segura</div>
+                <div style="font-size: 12px; color: var(--text-secondary);">Metadatos destruidos</div>
+              </div>
+            </div>
+            <div class="stats-row">
+              <span class="stats-label">Datos eliminados:</span>
+              <span class="stats-val good">100%</span>
+            </div>
+            <div class="stats-row">
+              <span class="stats-label">GPS / Ubicación:</span>
+              <span class="stats-val good">Limpio</span>
+            </div>
+            <div class="stats-row">
+              <span class="stats-label">Modelo Cámara:</span>
+              <span class="stats-val good">Limpio</span>
+            </div>
+          </div>
+
+          <button id="downloadBtnExif" class="btn-primary" disabled>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            Descargar Imagen Segura
+          </button>
+
+          <div style="margin-top: 24px; font-size: 12px; color: var(--text-tertiary); line-height: 1.5; padding: 16px; background: rgba(0,0,0,0.2); border-radius: 8px;">
+            <strong>¿Cómo funciona?</strong><br>
+            Al cargar la imagen, extraemos únicamente los píxeles y creamos un archivo completamente nuevo. Esto destruye automáticamente cualquier etiqueta EXIF, XMP o IPTC incrustada en el archivo original sin perder la calidad visual. Todo ocurre en tu navegador.
+          </div>
+
+        </aside>
+
+        <section class="preview-area" id="previewAreaExif">
+          <div class="empty-state" id="emptyStateExif">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+            <div>Sube una foto para limpiar sus metadatos</div>
+          </div>
+          <div class="preview-container hidden" id="previewContainerExif" style="position: relative;">
+            <img id="previewImgExif" />
+            <div id="loadingOverlayExif" class="overlay hidden">
+              <div class="spinner"></div>
+              <div class="overlay-text" id="overlayTextExif">Eliminando rastros...</div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+</Layout>
+
+<style>
+/* Stats Card */
+.stats-card {
+  background: var(--bg-base);
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  margin-bottom: 24px;
+}
+.stats-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.stats-row:last-child {
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+  margin-top: 4px;
+  margin-bottom: 0;
+}
+.stats-label { color: var(--text-secondary); font-size: 13px; }
+.stats-val { font-family: var(--font-mono); font-size: 13px; color: var(--text-main); }
+.stats-val.good { color: #48BB78; font-weight: bold; }
+</style>
+
+<script>
+  const stateExif = {
+    file: null as File | null,
+    dataUrl: null as string | null
+  };
+
+  const dropZoneExif = document.getElementById('dropZoneExif');
+  const fileInputExif = document.getElementById('fileInputExif') as HTMLInputElement;
+  const fileNameExif = document.getElementById('fileNameExif');
+  const emptyStateExif = document.getElementById('emptyStateExif');
+  const previewContainerExif = document.getElementById('previewContainerExif');
+  const previewImgExif = document.getElementById('previewImgExif') as HTMLImageElement;
+  const downloadBtnExif = document.getElementById('downloadBtnExif') as HTMLButtonElement;
+  const exifStats = document.getElementById('exifStats');
+  
+  const loadingOverlayExif = document.getElementById('loadingOverlayExif');
+  const overlayTextExif = document.getElementById('overlayTextExif');
+
+  let objectUrl: string | null = null;
+
+  if (dropZoneExif && fileInputExif) {
+    dropZoneExif.addEventListener('click', () => fileInputExif.click());
+    dropZoneExif.addEventListener('dragover', (e) => { e.preventDefault(); dropZoneExif.classList.add('dragover'); });
+    dropZoneExif.addEventListener('dragleave', () => dropZoneExif.classList.remove('dragover'));
+    dropZoneExif.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZoneExif.classList.remove('dragover');
+      if (e.dataTransfer?.files && e.dataTransfer.files[0]) handleFileExif(e.dataTransfer.files[0]);
+    });
+    fileInputExif.addEventListener('change', (e) => {
+      const target = e.target as HTMLInputElement;
+      if (target.files && target.files[0]) handleFileExif(target.files[0]);
+    });
+  }
+
+  function showLoading() {
+    if(!loadingOverlayExif || !overlayTextExif) return;
+    loadingOverlayExif.className = 'overlay';
+    overlayTextExif.textContent = 'Eliminando rastros EXIF...';
+  }
+
+  function showSuccess() {
+    if(!loadingOverlayExif || !overlayTextExif) return;
+    loadingOverlayExif.className = 'overlay overlay-success';
+    overlayTextExif.textContent = '¡Imagen completamente limpia!';
+    setTimeout(() => {
+      loadingOverlayExif.classList.add('hidden');
+    }, 1500);
+  }
+
+  function handleFileExif(file: File) {
+    if (!file.type.startsWith('image/')) return;
+    stateExif.file = file;
+    if(fileNameExif) {
+      fileNameExif.textContent = file.name;
+      fileNameExif.classList.remove('hidden');
+    }
+    const uploadText = dropZoneExif?.querySelector('.upload-text');
+    if(uploadText) uploadText.textContent = 'Procesar otra foto';
+    
+    emptyStateExif?.classList.add('hidden');
+    previewContainerExif?.classList.remove('hidden');
+    
+    showLoading();
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        // Render image to canvas to strip all EXIF metadata
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0);
+
+        // Export as clean JPEG/PNG based on original
+        const format = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+        const quality = format === 'image/jpeg' ? 0.95 : undefined; // Mantiene alta calidad
+
+        canvas.toBlob((blob) => {
+          if (!blob) return;
+          
+          setTimeout(() => {
+            if (objectUrl) URL.revokeObjectURL(objectUrl);
+            objectUrl = URL.createObjectURL(blob);
+            stateExif.dataUrl = objectUrl;
+            previewImgExif.src = objectUrl;
+            
+            exifStats?.classList.remove('hidden');
+            if(downloadBtnExif) downloadBtnExif.disabled = false;
+            
+            showSuccess();
+          }, 800); // Fake delay to let user read the "stripping" message
+          
+        }, format, quality);
+      };
+      img.src = e.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  downloadBtnExif?.addEventListener('click', () => {
+    if (!stateExif.dataUrl || !stateExif.file) return;
+    const link = document.createElement('a');
+    const origParts = stateExif.file.name.split('.');
+    const ext = origParts.pop() || 'jpg';
+    const origName = origParts.join('.');
+    
+    link.download = `${origName}_segura.${ext}`;
+    link.href = stateExif.dataUrl;
+    link.click();
+  });
+</script>
