@@ -29,15 +29,27 @@ import Topbar from '../components/Topbar.astro';
             <div class="control-header">
               <label class="control-label">Dimensiones (Pixeles)</label>
             </div>
-            <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px;">
-              <input type="number" id="resWidth" placeholder="Ancho" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid var(--border); background: var(--bg-panel); color: var(--text-main);">
-              <span style="color: var(--text-tertiary);">x</span>
-              <input type="number" id="resHeight" placeholder="Alto" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid var(--border); background: var(--bg-panel); color: var(--text-main);">
+            <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 12px; width: 100%;">
+              <div class="premium-number-input">
+                <button type="button" id="btnWMinus">&minus;</button>
+                <input type="number" id="resWidth" placeholder="Ancho">
+                <button type="button" id="btnWPlus">&plus;</button>
+              </div>
+              <span style="color: var(--text-tertiary); font-weight: bold;">×</span>
+              <div class="premium-number-input">
+                <button type="button" id="btnHMinus">&minus;</button>
+                <input type="number" id="resHeight" placeholder="Alto">
+                <button type="button" id="btnHPlus">&plus;</button>
+              </div>
             </div>
-            <div style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-secondary);">
+            
+            <label class="custom-checkbox">
               <input type="checkbox" id="resKeepRatio" checked>
-              <label for="resKeepRatio">Mantener proporción</label>
-            </div>
+              <span class="checkmark">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              </span>
+              <span class="label-text">Mantener proporción</span>
+            </label>
           </div>
 
           <div class="control-group">
@@ -118,6 +130,100 @@ import Topbar from '../components/Topbar.astro';
 .stats-label { color: var(--text-secondary); font-size: 13px; }
 .stats-val { font-family: var(--font-mono); font-size: 13px; color: var(--text-main); }
 .stats-val.highlight { color: var(--accent); font-weight: bold; }
+
+/* Premium Number Inputs */
+.premium-number-input {
+  display: flex;
+  align-items: center;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  width: 100%;
+  transition: border-color 0.2s;
+}
+.premium-number-input:focus-within {
+  border-color: var(--accent);
+}
+.premium-number-input button {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  width: 36px;
+  height: 38px;
+  cursor: pointer;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, color 0.2s;
+}
+.premium-number-input button:hover {
+  background: var(--border);
+  color: var(--text-main);
+}
+.premium-number-input input {
+  width: 100%;
+  border: none;
+  background: transparent;
+  text-align: center;
+  color: var(--text-main);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  outline: none;
+  -moz-appearance: textfield;
+}
+.premium-number-input input::-webkit-outer-spin-button,
+.premium-number-input input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Custom Checkbox */
+.custom-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+.custom-checkbox input {
+  display: none;
+}
+.checkmark {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 2px solid var(--border);
+  background: var(--bg-panel);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+.checkmark svg {
+  width: 12px;
+  height: 12px;
+  color: white;
+  opacity: 0;
+  transform: scale(0.5);
+  transition: all 0.2s;
+}
+.custom-checkbox input:checked + .checkmark {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.custom-checkbox input:checked + .checkmark svg {
+  opacity: 1;
+  transform: scale(1);
+}
+.label-text {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.custom-checkbox:hover .label-text {
+  color: var(--text-main);
+}
 </style>
 
 <script>
@@ -174,6 +280,18 @@ import Topbar from '../components/Topbar.astro';
       if (target.files && target.files[0]) handleFileRes(target.files[0]);
     });
   }
+
+  // Dimension Button Handlers
+  const updateInput = (input: HTMLInputElement, delta: number) => {
+    const val = parseInt(input.value) || 0;
+    input.value = Math.max(1, val + delta).toString();
+    input.dispatchEvent(new Event('input')); // Trigger the input event to update calculations
+  };
+
+  document.getElementById('btnWMinus')?.addEventListener('click', () => updateInput(resWidth, -1));
+  document.getElementById('btnWPlus')?.addEventListener('click', () => updateInput(resWidth, 1));
+  document.getElementById('btnHMinus')?.addEventListener('click', () => updateInput(resHeight, -1));
+  document.getElementById('btnHPlus')?.addEventListener('click', () => updateInput(resHeight, 1));
 
   // Dimension Handlers
   resWidth?.addEventListener('input', (e) => {
