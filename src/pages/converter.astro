@@ -34,6 +34,8 @@ import Topbar from '../components/Topbar.astro';
               <option value="image/jpeg">JPEG</option>
               <option value="image/avif">AVIF</option>
               <option value="image/bmp">BMP</option>
+              <option value="image/svg+xml">SVG</option>
+              <option value="application/pdf">PDF</option>
             </select>
           </div>
 
@@ -186,6 +188,8 @@ import Topbar from '../components/Topbar.astro';
     if (stateConv.format === 'image/jpeg') ext = 'jpg';
     if (stateConv.format === 'image/avif') ext = 'avif';
     if (stateConv.format === 'image/bmp') ext = 'bmp';
+    if (stateConv.format === 'image/svg+xml') ext = 'svg';
+    if (stateConv.format === 'application/pdf') ext = 'pdf';
     
     const origParts = stateConv.file.name.split('.');
     const origName = origParts.length > 1 ? origParts.slice(0, -1).join('.') : stateConv.file.name;
@@ -266,23 +270,28 @@ import Topbar from '../components/Topbar.astro';
     tempCanvas.height = stateConv.image.height;
     const tempCtx = tempCanvas.getContext('2d');
     
-    // Rellenamos de blanco en caso de pasar PNG transparente a JPEG
-    if (stateConv.format === 'image/jpeg') {
+    // Rellenamos de blanco en caso de pasar PNG transparente a JPEG o PDF
+    if (stateConv.format === 'image/jpeg' || stateConv.format === 'application/pdf') {
         tempCtx!.fillStyle = '#ffffff';
         tempCtx!.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
     }
     tempCtx?.drawImage(stateConv.image, 0, 0);
 
-    tempCanvas.toBlob((blob) => {
+    function processBlob(blob: Blob | null) {
       if (!blob || !stateConv.file) return;
       
-      // Delay visual para mejor feedback UX
       setTimeout(() => {
         if (objectUrl) URL.revokeObjectURL(objectUrl);
         
         objectUrl = URL.createObjectURL(blob);
         stateConv.dataUrl = objectUrl;
-        previewImgConv.src = objectUrl;
+        
+        // El navegador no puede renderizar un PDF dentro de un <img>, así que mostramos la imagen original
+        if (stateConv.format === 'application/pdf') {
+          previewImgConv.src = tempCanvas.toDataURL('image/jpeg');
+        } else {
+          previewImgConv.src = objectUrl;
+        }
 
         const origBytes = stateConv.file.size;
         const convBytes = blob.size;
@@ -292,7 +301,29 @@ import Topbar from '../components/Topbar.astro';
         
         showSuccess();
       }, 500);
-      
-    }, stateConv.format, stateConv.quality / 100);
+    }
+
+    if (stateConv.format === 'application/pdf') {
+      import('jspdf').then(({ jsPDF }) => {
+        const imgData = tempCanvas.toDataURL('image/jpeg', stateConv.quality / 100);
+        const doc = new jsPDF({
+          orientation: tempCanvas.width > tempCanvas.height ? 'landscape' : 'portrait',
+          unit: 'px',
+          format: [tempCanvas.width, tempCanvas.height]
+        });
+        doc.addImage(imgData, 'JPEG', 0, 0, tempCanvas.width, tempCanvas.height);
+        processBlob(doc.output('blob'));
+      });
+      return;
+    }
+
+    if (stateConv.format === 'image/svg+xml') {
+      const imgData = tempCanvas.toDataURL('image/jpeg', stateConv.quality / 100);
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${tempCanvas.width}" height="${tempCanvas.height}"><image href="${imgData}" width="${tempCanvas.width}" height="${tempCanvas.height}"/></svg>`;
+      processBlob(new Blob([svg], { type: 'image/svg+xml' }));
+      return;
+    }
+
+    tempCanvas.toBlob(processBlob, stateConv.format, stateConv.quality / 100);
   }
 </script>
